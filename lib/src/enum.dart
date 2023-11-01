@@ -20,4 +20,6 @@
  * SOFTWARE.
  */
 
-enum TooltipPosition { top, bottom }
+enum TooltipPosition { top, center, bottom }
+
+enum TooltipHorizontalPosition { left, center, right }
