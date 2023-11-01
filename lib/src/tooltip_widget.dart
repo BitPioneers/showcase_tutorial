@@ -57,11 +57,14 @@ class ToolTipWidget extends StatefulWidget {
   final Alignment? scaleAnimationAlignment;
   final bool isTooltipDismissed;
   final TooltipPosition? tooltipPosition;
+  final TooltipHorizontalPosition? tooltipHorizontalPosition;
   final EdgeInsets? titlePadding;
   final EdgeInsets? descriptionPadding;
   final Widget? actions;
   final ActionsSettings? actionSettings;
   final ActionButtonsPosition? actionButtonsPosition;
+  final Widget? overlayWidget;
+  final AlignmentGeometry? overlayAlignment;
 
   //final GlobalKey key;
 
@@ -93,11 +96,14 @@ class ToolTipWidget extends StatefulWidget {
     this.scaleAnimationAlignment,
     this.isTooltipDismissed = false,
     this.tooltipPosition,
+    this.tooltipHorizontalPosition,
     this.titlePadding,
     this.descriptionPadding,
     this.actions,
     this.actionSettings,
     this.actionButtonsPosition,
+    this.overlayWidget,
+    this.overlayAlignment,
   }) : super(key: key);
 
   @override
@@ -187,6 +193,7 @@ class _ToolTipWidgetState extends State<ToolTipWidget> with TickerProviderStateM
 
   double? _getLeft() {
     if (widget.position != null) {
+      return widget.position!.getCenter();
       final width = widget.container != null ? _customContainerWidth.value : tooltipWidth;
       double leftPositionValue = widget.position!.getCenter() - (width * 0.5);
       if ((leftPositionValue + width) > MediaQuery.of(context).size.width) {
@@ -219,13 +226,22 @@ class _ToolTipWidgetState extends State<ToolTipWidget> with TickerProviderStateM
   }
 
   double _getSpace() {
-    var space = widget.position!.getCenter() - (widget.contentWidth! / 2);
-    if (space + widget.contentWidth! > widget.screenSize!.width) {
-      space = widget.screenSize!.width - widget.contentWidth! - 8;
-    } else if (space < (widget.contentWidth! / 2)) {
-      space = 16;
+    final horizontalPosition = widget.tooltipHorizontalPosition ?? TooltipHorizontalPosition.center;
+    switch(horizontalPosition) {
+      case TooltipHorizontalPosition.left:
+        return widget.position!.getCenter();
+      case TooltipHorizontalPosition.center:
+        return widget.position!.getCenter() - (widget.contentWidth! / 2);
+      case TooltipHorizontalPosition.right:
+        return widget.position!.getCenter() - widget.contentWidth!;
     }
-    return space;
+    // var space = widget.position!.getCenter() - (widget.contentWidth! / 2);
+    // if (space + widget.contentWidth! > widget.screenSize!.width) {
+    //   space = widget.screenSize!.width - widget.contentWidth! - 8;
+    // } else if (space < (widget.contentWidth! / 2)) {
+    //   space = 16;
+    // }
+    // return space;
   }
 
   double _getAlignmentX() {
@@ -328,14 +344,28 @@ class _ToolTipWidgetState extends State<ToolTipWidget> with TickerProviderStateM
     super.dispose();
   }
 
+  double _getContentOffsetMultiplier(TooltipPosition position) {
+    switch (position) {
+      case TooltipPosition.top:
+        return -1;
+      case TooltipPosition.bottom:
+        return 1;
+      case TooltipPosition.center:
+      default:
+        return 0;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     position = widget.offset;
     final contentOrientation = findPositionForContent(position!);
-    final contentOffsetMultiplier = contentOrientation == TooltipPosition.bottom ? 1.0 : -1.0;
+    final contentOffsetMultiplier = _getContentOffsetMultiplier(contentOrientation);
     isArrowUp = contentOffsetMultiplier == 1.0;
 
-    final contentY = isArrowUp
+    final contentY = widget.tooltipPosition == TooltipPosition.center
+        ? widget.position!.getVerticalCenter()
+        : isArrowUp
         ? widget.position!.getBottom() + (contentOffsetMultiplier * 3)
         : widget.position!.getTop() + (contentOffsetMultiplier * 3);
 
@@ -362,6 +392,9 @@ class _ToolTipWidgetState extends State<ToolTipWidget> with TickerProviderStateM
     var actionTopPosWithContainer = isArrowUp
         ? (contentY + arrowHeight + tooltipHeight + widget.position!.getHeightContainer())
         : contentY - (arrowHeight + tooltipHeight + widget.position!.getHeightContainer());
+
+    final offsetWhenCentered = (contentOrientation == TooltipPosition.center)
+        ? widget.position!.getWidthContainer() / 2 : 0.0;
 
     if (widget.container == null) {
       return Stack(
@@ -494,10 +527,12 @@ class _ToolTipWidgetState extends State<ToolTipWidget> with TickerProviderStateM
         ],
       );
     }
+    final targetWidth = widget.position!.getWidth();
+    final targetHeight = widget.position!.getHeight();
     return Stack(
       children: <Widget>[
         Positioned(
-          left: _getSpace(),
+          left: _getSpace() + offsetWhenCentered,
           top: contentY - 10,
           child: FractionalTranslation(
             translation: Offset(0.0, contentFractionalOffset as double),
@@ -543,6 +578,19 @@ class _ToolTipWidgetState extends State<ToolTipWidget> with TickerProviderStateM
                 width: widget.actionSettings?.containerWidth,
                 child: widget.actions!,
               ),
+            ),
+          ),
+        if (widget.overlayWidget != null) 
+          Positioned(
+            left: widget.position!.getCenter() - targetWidth / 2,
+            top: widget.position!.getVerticalCenter() - targetHeight / 2,
+            child: Container(
+              alignment: widget.overlayAlignment,
+              constraints: BoxConstraints(
+                minWidth: targetWidth,
+                minHeight: targetHeight,
+              ),
+              child: widget.overlayWidget!,
             ),
           ),
       ],
